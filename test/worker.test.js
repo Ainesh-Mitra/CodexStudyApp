@@ -25,3 +25,8 @@ test('browser preflight allows the configured website and rejects other origins'
 test('health identifies missing runtime variables without revealing credentials',async()=>{
  const response=await worker.fetch(new Request('https://push.test/health'),{APP_ORIGIN:'https://codexstudyapp.pages.dev',SUPABASE_SERVICE_ROLE_KEY:'do-not-expose'});assert.equal(response.status,200);const text=await response.text();assert.ok(!text.includes('do-not-expose'));const data=JSON.parse(text);assert.equal(data.allowedOrigin,'https://codexstudyapp.pages.dev');assert.ok(data.missing.includes('VAPID_PUBLIC_KEY'));assert.equal(data.configuration,'needs_configuration');
 });
+test('test push reports missing backend database grants without exposing errors or secrets',async()=>{
+ const keys=webpush.generateVAPIDKeys(),env={APP_ORIGIN:'https://planner.test',SUPABASE_URL:'https://database.test',SUPABASE_SERVICE_ROLE_KEY:'private-backend-key',VAPID_PUBLIC_KEY:keys.publicKey,VAPID_PRIVATE_KEY:keys.privateKey,VAPID_SUBJECT:'mailto:test@example.com'};
+ const original=globalThis.fetch;globalThis.fetch=async url=>String(url).includes('/auth/v1/user')?Response.json({id:'alice'}):Response.json({message:'private database error'},{status:403});
+ try{const response=await worker.fetch(new Request('https://push.test/test',{method:'POST',headers:{Origin:env.APP_ORIGIN,Authorization:'Bearer user-token'}}),env);assert.equal(response.status,503);const body=await response.text();assert.match(body,/worker-permissions.sql/);assert.ok(!body.includes('private database error'));assert.ok(!body.includes(env.SUPABASE_SERVICE_ROLE_KEY));assert.equal(response.headers.get('Access-Control-Allow-Origin'),env.APP_ORIGIN)}finally{globalThis.fetch=original}
+});

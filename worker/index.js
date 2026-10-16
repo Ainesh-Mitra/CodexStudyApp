@@ -20,7 +20,7 @@ function configuration(env){
 }
 async function db(env,path,options={}){
  const response=await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`,{...options,headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,Authorization:`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,'Content-Type':'application/json',...options.headers},signal:AbortSignal.timeout(15000)});
- if(!response.ok){const error=new Error('Database operation failed');error.status=response.status;throw error}
+ if(!response.ok){const error=new Error('Database operation failed');error.status=response.status;error.stage='database';throw error}
  const text=await response.text();return text?JSON.parse(text):null;
 }
 async function claim(env,user,slot){
@@ -78,7 +78,13 @@ export default {
    const results=await Promise.allSettled(list.map(device=>send(env,device,{title:'Dayline is connected',body:'Your hourly progress updates will arrive here.',tag:'dayline-test'})));
    if(!results.some(r=>r.status==='fulfilled'&&r.value))return json({error:'No device accepted the notification. Reconnect this device and retry.'},502,origin);
    return json({sent:true},200,origin);
-  }catch{return json({error:'Notification service unavailable. Please retry later.'},503,origin)}
+  }catch(error){
+   if(error.stage==='database'){
+    const message=error.status===403?'The Worker lacks database permissions. Run supabase/worker-permissions.sql in your Supabase SQL editor.':error.status===401?'Supabase rejected the backend key. Check SUPABASE_SERVICE_ROLE_KEY in Worker runtime settings.':error.status===404?'A notification database table is missing or unavailable. Run the latest supabase/schema.sql in your project.':`The notification database request failed (HTTP ${error.status}). Please retry later.`;
+    return json({error:message},503,origin);
+   }
+   return json({error:'The Worker could not complete the notification request. Check Worker logs or retry shortly.'},503,origin);
+  }
  },
  async scheduled(event,env,ctx){ctx.waitUntil(runSchedule(env,new Date(event.scheduledTime)))}
 };
