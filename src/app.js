@@ -1,3 +1,4 @@
+import { pushBaseUrl, readPushResponse } from './push-client.js';
 import { createClient } from '@supabase/supabase-js';
 import { dateParts, validatePlan, emptyPlan } from './model.js';
 
@@ -209,7 +210,14 @@ document.querySelector('#reload-cloud').addEventListener('click',async()=>{if(!u
 let registration=null;
 if('serviceWorker' in navigator&&isSecureContext)navigator.serviceWorker.register('/sw.js').then(r=>registration=r).catch(()=>{});
 function requireCloud(){if(!cloud||!user)throw Error('Log in to connect notifications to your private schedule.');if(!config.pushUrl)throw Error('Push delivery has not been configured for this deployment.');}
-async function pushRequest(path,options={}){requireCloud();const {data:{session}}=await cloud.auth.getSession();const response=await fetch(config.pushUrl.replace(/\/$/,'')+path,{...options,headers:{Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'}});const result=await response.json();if(!response.ok)throw Error(result.error||'Notification service unavailable.');return result}
+async function pushRequest(path,options={}){
+ requireCloud();const base=pushBaseUrl(config.pushUrl);
+ const {data:{session},error}=await cloud.auth.getSession();
+ if(error||!session?.access_token)throw Error('Your login has expired. Log out and log in again.');
+ let response;try{response=await fetch(base+path,{...options,headers:{Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},signal:AbortSignal.timeout(20000)})}
+ catch{throw Error('Could not reach the notification Worker. Check PUSH_API_URL and make sure APP_ORIGIN matches this website exactly.');}
+ return readPushResponse(response,path);
+}
 function pushStatus(message){document.querySelector('#push-status').textContent=message}
 for(const id of ['start-hour','end-hour'])for(let h=0;h<24;h++){const option=document.createElement('option');option.value=h;option.textContent=timeLabel(h*4);document.getElementById(id).append(option)}
 document.querySelector('#notifications-button').addEventListener('click',async()=>{
