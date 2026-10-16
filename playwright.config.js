@@ -1,0 +1,2 @@
+import {defineConfig} from '@playwright/test';import {existsSync} from 'node:fs';
+export default defineConfig({testDir:'./test/browser',workers:1,timeout:30000,use:{baseURL:'http://127.0.0.1:4173',viewport:{width:1280,height:1000},timezoneId:'America/Los_Angeles',launchOptions:{...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:existsSync('/usr/bin/chromium')?{executablePath:'/usr/bin/chromium'}:{}),args:['--no-sandbox']}},webServer:{command:'npm run build && PORT=4173 node server.js',url:'http://127.0.0.1:4173',reuseExistingServer:false}});

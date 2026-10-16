@@ -1,0 +1,17 @@
+import test from 'node:test';import assert from 'node:assert/strict';import webpush from 'web-push';
+import worker,{allowedEndpoint,inHours,runSchedule} from '../worker/index.js';import {emptyPlan} from '../src/model.js';
+test('push endpoints cannot target arbitrary servers or follow redirects',()=>{assert.equal(allowedEndpoint('https://fcm.googleapis.com/fcm/send/x'),true);assert.equal(allowedEndpoint('https://web.push.apple.com/x'),true);for(const url of ['http://fcm.googleapis.com/x','https://fcm.googleapis.com.evil.test/x','https://localhost/x','https://fcm.googleapis.com:8443/x','https://user@fcm.googleapis.com/x'])assert.equal(allowedEndpoint(url),false)});
+test('hour ranges include both boundaries and support overnight hours',()=>{assert.equal(inHours(0,0,23),true);assert.equal(inHours(23,22,6),true);assert.equal(inHours(5,22,6),true);assert.equal(inHours(12,22,6),false)});
+test('scheduler encrypts pushes, isolates users, deduplicates retries and removes expired endpoints',async()=>{
+ const keys=webpush.generateVAPIDKeys(),recipient=webpush.generateVAPIDKeys(),p=emptyPlan();p.timezone='Asia/Kathmandu';
+ const env={SUPABASE_URL:'https://database.test',SUPABASE_SERVICE_ROLE_KEY:'test-service',APP_ORIGIN:'https://planner.test',VAPID_PUBLIC_KEY:keys.publicKey,VAPID_PRIVATE_KEY:keys.privateKey,VAPID_SUBJECT:'mailto:test@example.com'};
+ let claims=new Set(),deliveries=0,removed=false;const original=globalThis.fetch;
+ globalThis.fetch=async(url,options={})=>{const u=new URL(url);if(u.hostname==='fcm.googleapis.com'){deliveries++;assert.equal(options.redirect,'error');assert.equal(options.headers['Content-Encoding']||options.headers['content-encoding'],'aes128gcm');assert.ok(options.body.byteLength>0);return new Response(null,{status:410})}
+ assert.equal(options.headers.Authorization,'Bearer test-service');
+ if(u.pathname.endsWith('/notification_settings'))return Response.json([{user_id:'alice',timezone:p.timezone,enabled:true,start_hour:0,end_hour:23}]);
+ if(u.pathname.endsWith('/planners'))return Response.json([{data:p}]);
+ if(u.pathname.endsWith('/push_subscriptions')){if(options.method==='DELETE'){removed=true;return new Response(null,{status:204})}assert.equal(u.searchParams.get('user_id'),'eq.alice');return Response.json([{id:'device',endpoint:'https://fcm.googleapis.com/fcm/send/test',subscription:{endpoint:'https://fcm.googleapis.com/fcm/send/test',keys:{p256dh:recipient.publicKey,auth:Buffer.alloc(16,1).toString('base64url')}}}])}
+ if(u.pathname.endsWith('/push_deliveries')){if(options.method==='DELETE')return new Response(null,{status:204});const key=JSON.parse(options.body).slot;if(claims.has(key))return new Response(null,{status:409});claims.add(key);return new Response(null,{status:201})}throw Error('Unexpected request '+url)};
+ try{await runSchedule(env,new Date('2026-10-16T03:15:00Z'));assert.equal(deliveries,1);assert.equal(removed,true);await runSchedule(env,new Date('2026-10-16T03:15:00Z'));assert.equal(deliveries,1);await runSchedule(env,new Date('2026-10-16T03:30:00Z'));assert.equal(deliveries,1)}finally{globalThis.fetch=original}
+});
+test('test notification API rejects foreign origins and missing authentication',async()=>{const env={APP_ORIGIN:'https://planner.test'};assert.equal((await worker.fetch(new Request('https://push.test/test',{method:'POST',headers:{Origin:'https://evil.test'}}),env)).status,403);assert.equal((await worker.fetch(new Request('https://push.test/test',{method:'POST',headers:{Origin:env.APP_ORIGIN}}),env)).status,401)});

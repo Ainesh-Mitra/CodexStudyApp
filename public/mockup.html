@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dayline · Weekly planner mockup</title>
+<style>
+:root{font-family:Inter,ui-sans-serif,system-ui,sans-serif;color:#202b46;background:#f4f6fb;font-synthesis:none;--hour:88px}*{box-sizing:border-box}body{margin:0}button,input{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible,.subject:focus-visible{outline:3px solid #2563eb;outline-offset:3px}header{padding:22px 28px;display:flex;justify-content:space-between;align-items:center;background:white;border-bottom:1px solid #e0e5ef;gap:20px}h1{font-size:25px;letter-spacing:-1px;margin:0}header p{font-size:13px;color:#788397;margin:4px 0 0}.week-title{font-weight:600;font-size:15px}.badge{font-size:12px;background:#eef2ff;color:#5366b7;border-radius:20px;padding:7px 12px}.hint{margin:0;padding:12px 28px;font-size:13px;color:#65718b;line-height:1.5}.calendar-scroll{height:calc(100dvh - 255px);min-height:280px;overflow:auto;margin:0 22px;background:white;border:1px solid #dfe5ef;border-radius:12px;transition:height .25s}body.tray-hidden .calendar-scroll{height:calc(100dvh - 165px)}.calendar{min-width:850px;position:relative}.day-heads{display:grid;grid-template-columns:64px repeat(7,minmax(0,1fr));position:sticky;top:0;z-index:3;background:#fff;border-bottom:1px solid #dfe5ef}.day-head{height:68px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-left:1px solid #e6eaf2;font-size:13px;color:#67748c}.day-head strong{font-size:17px;color:#263551}.day-head.today{background:#eef3ff;color:#315edb}.day-head.today strong{background:#3563e9;color:white;border-radius:50%;width:28px;height:28px;text-align:center;line-height:28px}.grid-body{display:grid;grid-template-columns:64px repeat(7,minmax(0,1fr))}.times{position:relative;height:calc(24 * var(--hour));background:#fcfdff}.time{position:absolute;right:10px;font-size:11px;color:#7c879b;transform:translateY(-50%)}.day{height:calc(24 * var(--hour));position:relative;border-left:1px solid #e3e8f1;background:repeating-linear-gradient(to bottom,transparent 0,transparent 21px,#eff2f8 21px,#eff2f8 22px,transparent 22px,transparent 43px,#eff2f8 43px,#eff2f8 44px,transparent 44px,transparent 65px,#eff2f8 65px,#eff2f8 66px,transparent 66px,transparent 87px,#d8dfeb 87px,#d8dfeb 88px)}.day.over{background-color:#f0f4ff}.event{position:absolute;left:4px;right:4px;border-radius:5px;border-left:3px solid var(--color);background:var(--tint);padding:2px 6px;font-size:11px;overflow:hidden;line-height:17px;cursor:pointer;color:#263551;text-align:left}.event:hover{filter:brightness(.97)}.tray-wrap{position:relative;margin:28px 22px 0}.toggle{position:absolute;left:50%;top:-25px;transform:translateX(-50%);width:68px;height:26px;background:white;border:1px solid #dfe5ef;border-bottom:0;border-radius:15px 15px 0 0;color:#526283;font-size:21px;line-height:24px;z-index:5}.tray{background:white;border:1px solid #dfe5ef;border-radius:12px;box-shadow:0 5px 20px #23365b08;overflow:hidden;max-height:145px;transition:max-height .25s,opacity .25s}.tray-hidden .tray{max-height:0;opacity:0;border:0}.tray-inner{padding:16px 20px;display:flex;gap:25px;align-items:center}.tray-label{flex-shrink:0}.tray-label strong{font-size:14px}.tray-label p{font-size:11px;color:#7b879c;margin:4px 0 0}.subjects{display:flex;align-items:center;gap:10px;overflow-x:auto;padding:5px;flex:1}.subject{border:1px solid transparent;border-left:3px solid var(--color);background:var(--tint);border-radius:8px;padding:13px 18px;display:flex;align-items:center;gap:10px;white-space:nowrap;font-size:13px;font-weight:600;color:#2d3851;cursor:grab}.subject.selected{outline:2px solid #4066df;outline-offset:1px}.grip{color:var(--color);font-size:19px;letter-spacing:-3px;line-height:1}.add{flex-shrink:0;border:1px dashed #a9b8d1;background:#fff;color:#577095;border-radius:8px;width:48px;height:47px;font-size:27px}.footer{font-size:11px;color:#8b95a7;text-align:center;margin:10px 0}dialog{border:1px solid #dee4f0;border-radius:16px;padding:25px;width:min(380px,90vw);box-shadow:0 20px 90px #18264d33}dialog::backdrop{background:#15244555}dialog h2{font-size:20px;margin:0 0 20px}label{display:block;font-size:13px;font-weight:600;margin:15px 0 7px}input[type=text]{width:100%;padding:11px;border:1px solid #ccd5e5;border-radius:7px}input[type=color]{width:100%;height:42px;border:1px solid #ccd5e5;border-radius:7px;background:white;padding:4px}.actions{display:flex;justify-content:flex-end;gap:10px;margin-top:24px}.actions button{border:1px solid #dce2ed;padding:9px 16px;border-radius:7px;background:white}.actions .primary{background:#3563e9;color:white;border-color:#3563e9}.status{position:fixed;bottom:15px;left:50%;transform:translateX(-50%);background:#233451;color:white;font-size:13px;border-radius:8px;padding:10px 16px;z-index:9;pointer-events:none}.status:empty{display:none}@media(max-width:650px){header{padding:16px}.badge{display:none}.week-title{font-size:12px}.hint{padding:10px 16px;font-size:12px}.calendar-scroll{margin:0 10px}.tray-wrap{margin-left:10px;margin-right:10px}.tray-inner{display:block;padding:12px}.tray-label{display:flex;align-items:center;gap:12px;margin-bottom:7px}.tray-label p{margin:0}.subject{padding:10px 14px}.footer{font-size:10px}.calendar-scroll{height:calc(100dvh - 280px)}}
+
+.event{border-top:0;border-right:0;border-bottom:0;padding:0;overflow:visible;cursor:default;min-height:21px}
+.event-content{display:block;width:100%;height:100%;border:0;background:transparent;text-align:left;color:inherit;font:inherit;padding:3px 6px;overflow:hidden;border-radius:4px;cursor:grab;touch-action:none;user-select:none}
+.event-name{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:15px}
+.event-range{display:block;font-size:10px;line-height:15px;white-space:nowrap}
+.event.short .event-range{display:none}.resize-handle{position:absolute;left:0;right:0;height:7px;z-index:2;cursor:ns-resize;touch-action:none;user-select:none;border-radius:4px}
+.resize-handle.top{top:0}.resize-handle.bottom{bottom:0}
+.resize-handle:focus-visible{outline:2px solid var(--color)}
+.event.resizing{z-index:4;box-shadow:0 3px 12px #20345333}.event.resizing .event-content{pointer-events:none}
+.event-subject{display:block;font-size:10px;line-height:12px;color:#526079;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.event.short .event-content{padding:1px 6px}.event.short .event-name{font-size:9px;line-height:9px}.event.short .event-subject{font-size:9px;line-height:9px}.event.short .resize-handle{height:4px}
+
+dialog{color:#202b46;background:#fff;color-scheme:light}dialog input{color:#202b46;background:#fff}.actions button{color:#263551;font-weight:600;min-height:42px;appearance:none}.actions button[type=button]:not(.primary){background:#edf1f7;color:#263551;border:1px solid #aab7cc}.actions button[type=button]:not(.primary):hover{background:#dfe6f1}.actions .primary{color:#fff;background:#3563e9}.actions .primary:hover{background:#254fc5}
+.event.moving{z-index:5;box-shadow:0 4px 16px #20345344;opacity:.85}.event.moving .event-content{cursor:grabbing}
+.event.completed{background:#e5e7eb;border-left-color:#9ca3af;color:#6b7280}.event.completed .event-name,.event.completed .event-subject,.event.completed .event-range{text-decoration:line-through;color:#6b7280}
+</style>
+</head>
+<body>
+<header><div><h1>Dayline<span style="color:#5879e6">.</span></h1><p>A little structure. More room to focus.</p></div><div class="week-title">Your weekly schedule</div><span class="badge">Interactive mockup</span></header>
+<p class="hint">Each hour has four 15-minute slots. Drag a subject onto a slot, or select a subject and click a slot, then give the task a title. Drag a block’s top or bottom edge to resize it in 15-minute steps. Drag its center to move it to another time or day. Click to mark complete or undo. Ctrl + click to delete. Completion resets at local midnight.</p>
+<main><section class="calendar-scroll" aria-label="Scrollable weekly calendar"><div class="calendar"><div class="day-heads"><div></div></div><div class="grid-body"><div class="times"></div></div></div></section>
+<section class="tray-wrap" aria-label="Subject tray"><button class="toggle" aria-expanded="true" aria-controls="tray" aria-label="Hide subjects">⌄</button><div class="tray" id="tray"><div class="tray-inner"><div class="tray-label"><strong>Subjects</strong><p>Drag onto your week</p></div><div class="subjects" aria-label="Available subjects"><button class="add" aria-label="Add subject">+</button></div></div></div></section></main>
+<p class="footer">Design mockup · Changes last until you refresh · Notifications aren’t connected</p>
+<dialog><form id="subject-form"><h2>New subject</h2><label for="subject-name">Subject name</label><input id="subject-name" type="text" placeholder="e.g. History" maxlength="40" required autocomplete="off"><label for="subject-color">Block color</label><input id="subject-color" type="color" value="#8b5cf6"><div class="actions"><button type="button" id="cancel">Cancel</button><button class="primary" type="submit">Add subject</button></div></form></dialog>
+<dialog id="task-dialog" aria-labelledby="task-heading"><form id="task-form" novalidate><h2 id="task-heading">Name your task</h2><p id="task-context" style="color:#65718b;font-size:13px"></p><label for="task-title">Task title</label><input id="task-title" type="text" placeholder="e.g. Finish algebra homework" maxlength="80" required autocomplete="off"><p id="task-error" role="alert" hidden style="color:#b42318;font-size:13px"></p><div class="actions"><button type="button" id="task-cancel">Cancel</button><button class="primary" type="button" id="schedule-task">Add to schedule</button></div></form></dialog>
+<div class="status" role="status" aria-live="polite"></div>
+<script>
+const names=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const grid=document.querySelector('.grid-body'), heads=document.querySelector('.day-heads'), times=document.querySelector('.times'), tray=document.querySelector('.subjects'), add=document.querySelector('.add'), dialog=document.querySelector('dialog');
+const subjects=[];let selected=null;let statusTimer;let pendingTask=null;
+const taskDialog=document.querySelector('#task-dialog'),taskInput=document.querySelector('#task-title');
+function localDay(date=new Date()){return `${date.getFullYear()}-${date.getMonth()+1}-${date.getDate()}`}
+function resetExpiredCompletions(){
+ const date=localDay();
+ document.querySelectorAll('.event.completed').forEach(block=>{
+  if(block.dataset.completedOn===date)return;
+  block.classList.remove('completed');delete block.dataset.completedOn;
+  block.querySelector('.event-content').setAttribute('aria-pressed','false');
+ });
+ const currentDay=(new Date().getDay()+6)%7;
+ document.querySelectorAll('.day-head').forEach((head,index)=>head.classList.toggle('today',index===currentDay));
+}
+function scheduleDailyReset(){
+ const now=new Date(),midnight=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1);
+ setTimeout(()=>{resetExpiredCompletions();scheduleDailyReset()},midnight.getTime()-now.getTime()+50);
+}
+scheduleDailyReset();
+// Recheck after sleeping/backgrounding, and after device clock or timezone changes.
+setInterval(resetExpiredCompletions,30000);
+window.addEventListener('focus',resetExpiredCompletions);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)resetExpiredCompletions()});
+const today=(new Date().getDay()+6)%7;
+function announce(message){const status=document.querySelector('.status');status.textContent=message;clearTimeout(statusTimer);statusTimer=setTimeout(()=>status.textContent='',3500)}
+function timeLabel(slot){if(slot===96)return '12:00 AM (next day)';const hour=Math.floor(slot/4),minute=slot%4*15;return `${hour%12||12}:${String(minute).padStart(2,'0')} ${hour<12?'AM':'PM'}`}
+for(let hour=0;hour<24;hour++){const label=document.createElement('span');label.className='time';label.style.top=`${hour*88+3}px`;label.textContent=`${hour%12||12} ${hour<12?'AM':'PM'}`;times.append(label)}
+names.forEach((name,index)=>{const head=document.createElement('div');head.className='day-head'+(index===today?' today':'');head.textContent=name;const number=document.createElement('strong');number.textContent=['M','T','W','T','F','S','S'][index];head.append(number);heads.append(head);const day=document.createElement('div');day.className='day';day.dataset.day=index;day.setAttribute('aria-label',name);day.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='copy';day.classList.add('over')});day.addEventListener('dragleave',()=>day.classList.remove('over'));day.addEventListener('drop',e=>{e.preventDefault();day.classList.remove('over');const subject=subjects.find(s=>s.id===e.dataTransfer.getData('text/plain'));if(subject)requestTask(day,subject,slotAt(day,e.clientY))});day.addEventListener('click',e=>{if(e.target!==day)return;if(selected)requestTask(day,selected,slotAt(day,e.clientY));else announce('Select a subject in the tray first.')});grid.append(day)});
+function slotAt(day,y){return Math.max(0,Math.min(95,Math.floor((y-day.getBoundingClientRect().top)/22)))}
+function choose(subject){selected=subject;document.querySelectorAll('.subject').forEach(el=>{const active=el.dataset.id===subject.id;el.classList.toggle('selected',active);el.setAttribute('aria-pressed',String(active))})}
+function newSubject(name,color){const subject={id:String(subjects.length),name,color};subjects.push(subject);const tile=document.createElement('button');tile.type='button';tile.className='subject';tile.draggable=true;tile.dataset.id=subject.id;tile.style.setProperty('--color',color);tile.style.setProperty('--tint',color+'25');tile.setAttribute('aria-pressed','false');const grip=document.createElement('span');grip.className='grip';grip.textContent='⠿';grip.setAttribute('aria-hidden','true');const text=document.createElement('span');text.textContent=name;tile.append(grip,text);tile.addEventListener('click',()=>{choose(subject);announce(`${name} selected. Click a calendar slot to place it.`)});tile.addEventListener('dragstart',e=>{choose(subject);e.dataTransfer.setData('text/plain',subject.id);e.dataTransfer.effectAllowed='copy'});tray.insertBefore(tile,add);return subject}
+function occupied(day,start,end,except){return [...day.querySelectorAll('.event')].some(block=>block!==except&&start<Number(block.dataset.end)&&end>Number(block.dataset.slot))}
+function requestTask(day,subject,slot){
+ if(occupied(day,slot,slot+1)){announce('That time is already occupied. Choose an empty slot.');return}
+ pendingTask={day,subject,slot};taskInput.value='';taskInput.setCustomValidity('');document.querySelector('#task-error').hidden=true;
+ document.querySelector('#task-context').textContent=`${subject.name} · ${names[Number(day.dataset.day)]} · ${timeLabel(slot)}`;
+ taskDialog.showModal();taskInput.focus();
+}
+function cancelTask(){pendingTask=null;taskDialog.close()}
+document.querySelector('#task-cancel').addEventListener('click',cancelTask);
+taskDialog.addEventListener('cancel',()=>pendingTask=null);
+taskInput.addEventListener('input',()=>{taskInput.setCustomValidity('');document.querySelector('#task-error').hidden=true});
+function scheduleTask(e){
+ e.preventDefault();
+ const error=document.querySelector('#task-error'),name=taskInput.value.trim();
+ function showError(message){error.textContent=message;error.hidden=false;taskInput.focus()}
+ if(!name){showError('Please enter a title for your task.');return}
+ if(!pendingTask){showError('Please cancel and select a calendar slot again.');return}
+ const {day,subject,slot}=pendingTask;
+ if(occupied(day,slot,slot+1)){showError('That time is now occupied. Cancel and choose another slot.');return}
+ const block=place(day,subject,slot,name);
+ pendingTask=null;taskDialog.close();block.scrollIntoView({block:'nearest',inline:'nearest'});
+}
+document.querySelector('#schedule-task').addEventListener('click',scheduleTask);
+document.querySelector('#task-form').addEventListener('submit',scheduleTask);
+function place(day,subject,slot,taskTitle){
+ if(occupied(day,slot,slot+1)){announce('That time is already occupied. Choose an empty slot.');return}
+ const block=document.createElement('div');block.className='event';block.dataset.slot=slot;block.dataset.end=slot+1;
+ block.style.setProperty('--color',subject.color);block.style.setProperty('--tint',subject.color+'30');
+ const content=document.createElement('button');content.type='button';content.className='event-content';
+ const title=document.createElement('strong');title.className='event-name';title.textContent=taskTitle;
+ const range=document.createElement('span');range.className='event-range';const subjectLabel=document.createElement('span');subjectLabel.className='event-subject';subjectLabel.textContent=subject.name;content.append(title,subjectLabel,range);block.append(content);
+ function render(){const start=Number(block.dataset.slot),end=Number(block.dataset.end);block.style.top=`${start*22+1}px`;block.style.height=`${(end-start)*22-1}px`;block.classList.toggle('short',end-start===1);range.textContent=`${timeLabel(start)} – ${timeLabel(end)}`;block.title=`${taskTitle} · ${subject.name} · ${names[Number(day.dataset.day)]} · ${range.textContent}`;content.setAttribute('aria-label',`${block.title}. Drag to move; click to mark complete or undo; Ctrl + click to delete.`);block.querySelectorAll('.resize-handle').forEach(handle=>{const top=handle.dataset.edge==='top';handle.setAttribute('aria-valuemin',String(top?0:start+1));handle.setAttribute('aria-valuemax',String(top?end-1:96));handle.setAttribute('aria-valuenow',String(top?start:end));handle.setAttribute('aria-valuetext',timeLabel(top?start:end))})}
+ function resize(edge,value){let start=Number(block.dataset.slot),end=Number(block.dataset.end);if(edge==='top')start=Math.max(0,Math.min(end-1,value));else end=Math.min(96,Math.max(start+1,value));if(occupied(day,start,end,block))return false;block.dataset.slot=start;block.dataset.end=end;render();return true}
+ let suppressClick=false;
+ content.setAttribute('aria-pressed','false');
+ content.addEventListener('click',e=>{
+  e.stopPropagation();if(suppressClick){suppressClick=false;return}
+  resetExpiredCompletions();
+  if(e.ctrlKey){block.remove();announce('Block deleted.');return}
+  const completed=block.classList.toggle('completed');
+  content.setAttribute('aria-pressed',String(completed));
+  if(completed)block.dataset.completedOn=localDay();else delete block.dataset.completedOn;
+  announce(completed?`${taskTitle} marked complete.`:`${taskTitle} marked incomplete.`);
+ });
+ content.addEventListener('pointerdown',e=>{
+  if(e.button!==0)return;e.stopPropagation();suppressClick=false;
+  const pointer=e.pointerId,originDay=day,originStart=Number(block.dataset.slot),originEnd=Number(block.dataset.end),duration=originEnd-originStart;
+  const startX=e.clientX,startY=e.clientY,offset=(startY-originDay.getBoundingClientRect().top)/22-originStart;
+  let moved=false,valid=true;
+  // Capture on a stable parent so crossing day columns cannot lose the gesture.
+  function restore(){day=originDay;day.append(block);block.dataset.slot=originStart;block.dataset.end=originEnd;render()}
+  const move=event=>{
+   if(event.pointerId!==pointer)return;
+   if(!moved&&Math.hypot(event.clientX-startX,event.clientY-startY)<5)return;
+   event.preventDefault();if(!moved)grid.setPointerCapture(pointer);moved=true;suppressClick=true;block.classList.add('moving');
+   const scroller=document.querySelector('.calendar-scroll'),viewport=scroller.getBoundingClientRect();
+   const headerHeight=heads.getBoundingClientRect().height;
+   if(event.clientX<viewport.left||event.clientX>viewport.right||event.clientY<viewport.top+headerHeight||event.clientY>viewport.bottom){valid=false;return}
+   if(event.clientY>viewport.bottom-30)scroller.scrollTop+=12;
+   else if(event.clientY<viewport.top+headerHeight+30)scroller.scrollTop-=12;
+   const target=[...grid.querySelectorAll('.day')].find(column=>{const rect=column.getBoundingClientRect();return event.clientX>=rect.left&&event.clientX<rect.right});
+   if(!target){valid=false;return}
+   const start=Math.max(0,Math.min(96-duration,Math.round((event.clientY-target.getBoundingClientRect().top)/22-offset)));
+   if(occupied(target,start,start+duration,block)){valid=false;return}
+   valid=true;day=target;day.append(block);block.dataset.slot=start;block.dataset.end=start+duration;render();
+  };
+  const finish=event=>{
+   if(event.pointerId!==pointer)return;
+   document.removeEventListener('pointermove',move);document.removeEventListener('pointerup',finish);document.removeEventListener('pointercancel',finish);grid.removeEventListener('lostpointercapture',finish);
+   block.classList.remove('moving');
+   if(moved){if(!valid||event.type==='pointercancel'){restore();announce('Move canceled. Choose an empty time range.')}else announce(`Moved: ${block.title}`)}
+   if(grid.hasPointerCapture(pointer))grid.releasePointerCapture(pointer);
+  };
+  document.addEventListener('pointermove',move,{passive:false});document.addEventListener('pointerup',finish);document.addEventListener('pointercancel',finish);grid.addEventListener('lostpointercapture',finish);
+ });
+ for(const edge of ['top','bottom']){
+  const handle=document.createElement('span');handle.className=`resize-handle ${edge}`;handle.dataset.edge=edge;handle.tabIndex=0;handle.setAttribute('role','slider');handle.setAttribute('aria-label',`${taskTitle} ${edge==='top'?'start':'end'} time`);handle.setAttribute('aria-orientation','vertical');
+  handle.addEventListener('click',e=>e.stopPropagation());
+  handle.addEventListener('keydown',e=>{if(!['ArrowUp','ArrowDown'].includes(e.key))return;e.preventDefault();const current=Number(block.dataset[edge==='top'?'slot':'end']);resize(edge,current+(e.key==='ArrowUp'?-1:1));announce(block.title)});
+  handle.addEventListener('pointerdown',e=>{
+   if(e.button!==0)return;e.preventDefault();e.stopPropagation();handle.setPointerCapture(e.pointerId);
+   const pointer=e.pointerId,initialY=e.clientY,initialStart=Number(block.dataset.slot),initialEnd=Number(block.dataset.end),initialBoundary=edge==='top'?initialStart:initialEnd;
+   block.classList.add('resizing');
+   const move=event=>{if(event.pointerId!==pointer)return;event.preventDefault();resize(edge,initialBoundary+Math.round((event.clientY-initialY)/22))};
+   const finish=event=>{if(event.pointerId!==pointer)return;if(event.type==='pointercancel'){block.dataset.slot=initialStart;block.dataset.end=initialEnd;render()}block.classList.remove('resizing');handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',finish);handle.removeEventListener('pointercancel',finish);handle.removeEventListener('lostpointercapture',finish);if(handle.hasPointerCapture(pointer))handle.releasePointerCapture(pointer);announce(block.title)};
+   handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',finish);handle.addEventListener('pointercancel',finish);handle.addEventListener('lostpointercapture',finish);
+  });block.append(handle);
+ }
+ day.append(block);render();announce(`${taskTitle} (${subject.name}) scheduled for ${names[Number(day.dataset.day)]}, ${timeLabel(slot)}. Drag its edges to change the time range.`);return block
+}
+newSubject('Math','#4f7de9');newSubject('Science','#2aab7b');newSubject('Writing','#9862dc');
+document.querySelector('.toggle').addEventListener('click',e=>{const hidden=document.body.classList.toggle('tray-hidden');document.querySelector('#tray').inert=hidden;e.currentTarget.textContent=hidden?'⌃':'⌄';e.currentTarget.setAttribute('aria-expanded',String(!hidden));e.currentTarget.setAttribute('aria-label',hidden?'Show subjects':'Hide subjects')});
+add.addEventListener('click',()=>{dialog.showModal();document.querySelector('#subject-name').focus()});document.querySelector('#cancel').addEventListener('click',()=>dialog.close());document.querySelector('#subject-form').addEventListener('submit',e=>{e.preventDefault();const input=document.querySelector('#subject-name'),name=input.value.trim();if(!name){input.setCustomValidity('Enter a subject name.');input.reportValidity();return}const subject=newSubject(name,document.querySelector('#subject-color').value);choose(subject);dialog.close();input.value='';add.scrollIntoView({block:'nearest',inline:'nearest',behavior:'smooth'});announce(`${name} added. Drag it onto your week.`)});document.querySelector('#subject-name').addEventListener('input',e=>e.target.setCustomValidity(''));
+document.querySelector('.calendar-scroll').scrollTop=8*88;
+</script>
+</body>
+</html>

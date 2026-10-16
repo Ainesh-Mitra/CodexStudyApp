@@ -1,0 +1,3 @@
+self.addEventListener('push',event=>{let data;try{data=event.data.json()}catch{data={title:'Dayline',body:'Your progress update is ready.'}}event.waitUntil(self.registration.showNotification(data.title||'Dayline',{body:data.body||'Open your planner to see your progress.',tag:data.tag||'dayline',icon:'/icon.svg',data:{url:'/'}}))});
+self.addEventListener('notificationclick',event=>{event.notification.close();event.waitUntil((async()=>{for(const client of await clients.matchAll({type:'window',includeUncontrolled:true})){if(new URL(client.url).origin===self.location.origin){await client.focus();return}}await clients.openWindow('/')})())});
+self.addEventListener('activate',event=>event.waitUntil(clients.claim()));

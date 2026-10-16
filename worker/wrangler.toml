@@ -1,0 +1,11 @@
+name = "dayline-push"
+main = "index.js"
+compatibility_date = "2026-10-01"
+
+[triggers]
+crons = ["*/15 * * * *"]
+
+# Configure all variables/secrets with Wrangler or the dashboard. Do not put
+# the service-role key or VAPID private key in Pages build variables.
+# Required: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, VAPID_PUBLIC_KEY,
+# VAPID_PRIVATE_KEY, VAPID_SUBJECT (mailto:you@example.com), APP_ORIGIN.
