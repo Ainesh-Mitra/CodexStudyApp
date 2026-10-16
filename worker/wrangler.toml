@@ -1,6 +1,8 @@
 name = "dayline-push"
 main = "index.js"
 compatibility_date = "2026-10-01"
+# Preserve runtime variables managed in the Cloudflare dashboard.
+keep_vars = true
 
 [triggers]
 crons = ["*/15 * * * *"]
