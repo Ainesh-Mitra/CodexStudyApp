@@ -30,3 +30,22 @@ test('test push reports missing backend database grants without exposing errors 
  const original=globalThis.fetch;globalThis.fetch=async url=>String(url).includes('/auth/v1/user')?Response.json({id:'alice'}):Response.json({message:'private database error'},{status:403});
  try{const response=await worker.fetch(new Request('https://push.test/test',{method:'POST',headers:{Origin:env.APP_ORIGIN,Authorization:'Bearer user-token'}}),env);assert.equal(response.status,503);const body=await response.text();assert.match(body,/worker-permissions.sql/);assert.ok(!body.includes('private database error'));assert.ok(!body.includes(env.SUPABASE_SERVICE_ROLE_KEY));assert.equal(response.headers.get('Access-Control-Allow-Origin'),env.APP_ORIGIN)}finally{globalThis.fetch=original}
 });
+test('notification key validation detects mismatched VAPID pairs',async()=>{
+ const {vapidKeysMatch}=await import('../worker/index.js');const one=webpush.generateVAPIDKeys(),two=webpush.generateVAPIDKeys();assert.equal(await vapidKeysMatch({VAPID_PUBLIC_KEY:one.publicKey,VAPID_PRIVATE_KEY:one.privateKey}),true);assert.equal(await vapidKeysMatch({VAPID_PUBLIC_KEY:one.publicKey,VAPID_PRIVATE_KEY:two.privateKey}),false);
+});
+test('test push distinguishes push-service authentication rejection from an expired device',async()=>{
+ const pair=webpush.generateVAPIDKeys(),recipient=webpush.generateVAPIDKeys(),env={APP_ORIGIN:'https://planner.test',SUPABASE_URL:'https://database.test',SUPABASE_SERVICE_ROLE_KEY:'private-backend-key',VAPID_PUBLIC_KEY:pair.publicKey,VAPID_PRIVATE_KEY:pair.privateKey,VAPID_SUBJECT:'mailto:test@example.com'};
+ const original=globalThis.fetch;let pushStatus=403,deleted=false;
+ globalThis.fetch=async(url,options={})=>{
+  const u=new URL(url);if(u.hostname==='fcm.googleapis.com')return new Response(null,{status:pushStatus});
+  if(u.pathname.endsWith('/user'))return Response.json({id:'alice'});
+  if(u.pathname.endsWith('/push_subscriptions')){if(options.method==='DELETE'){deleted=true;return new Response(null,{status:204})}return Response.json([{id:'device',endpoint:'https://fcm.googleapis.com/x',subscription:{endpoint:'https://fcm.googleapis.com/x',keys:{p256dh:recipient.publicKey,auth:Buffer.alloc(16,1).toString('base64url')}}}])}
+  if(u.pathname.endsWith('/push_deliveries'))return new Response(null,{status:201});throw Error('Unexpected request');
+ };
+ try{
+  const request=()=>new Request('https://push.test/test',{method:'POST',headers:{Origin:env.APP_ORIGIN,Authorization:'Bearer user-token'}});
+  let response=await worker.fetch(request(),env);assert.equal(response.status,502);assert.match((await response.json()).error,/authentication \(HTTP 403\)/);assert.equal(deleted,false);
+  pushStatus=410;response=await worker.fetch(request(),env);assert.equal(response.status,502);assert.match((await response.json()).error,/expired/);assert.equal(deleted,true);
+  pushStatus=201;response=await worker.fetch(request(),env);assert.equal(response.status,200);assert.equal((await response.json()).sent,true);
+ }finally{globalThis.fetch=original}
+});

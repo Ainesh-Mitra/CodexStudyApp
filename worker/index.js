@@ -27,12 +27,35 @@ async function claim(env,user,slot){
  try{await db(env,'push_deliveries',{method:'POST',body:JSON.stringify({user_id:user,slot}),headers:{Prefer:'return=minimal'}});return true}catch(error){if(error.status===409)return false;throw error}
 }
 async function devices(env,user){return db(env,`push_subscriptions?user_id=eq.${encodeURIComponent(user)}&select=id,endpoint,subscription`)}
+export async function vapidKeysMatch(env){
+ try{
+  const raw=Uint8Array.from(atob(env.VAPID_PUBLIC_KEY.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));
+  const encode=bytes=>btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  const algorithm={name:'ECDSA',namedCurve:'P-256'};
+  const privateKey=await crypto.subtle.importKey('jwk',{kty:'EC',crv:'P-256',x:encode(raw.slice(1,33)),y:encode(raw.slice(33,65)),d:env.VAPID_PRIVATE_KEY},algorithm,false,['sign']);
+  const publicKey=await crypto.subtle.importKey('raw',raw,algorithm,false,['verify']);
+  const data=new TextEncoder().encode('Dayline notification key check'),signature=await crypto.subtle.sign({name:'ECDSA',hash:'SHA-256'},privateKey,data);
+  return await crypto.subtle.verify({name:'ECDSA',hash:'SHA-256'},publicKey,signature,data);
+ }catch{return false}
+}
 async function send(env,device,message){
- if(!allowedEndpoint(device.endpoint)||device.subscription?.endpoint!==device.endpoint)return false;
- const payload=await buildPushPayload({data:JSON.stringify(message),options:{ttl:3600}},device.subscription,{subject:env.VAPID_SUBJECT,publicKey:env.VAPID_PUBLIC_KEY,privateKey:env.VAPID_PRIVATE_KEY});
- const response=await fetch(device.endpoint,{...payload,redirect:'error',signal:AbortSignal.timeout(15000)});
- if(response.status===404||response.status===410){await db(env,`push_subscriptions?id=eq.${encodeURIComponent(device.id)}`,{method:'DELETE',headers:{Prefer:'return=minimal'}});return false}
- return response.ok;
+ if(!allowedEndpoint(device.endpoint))return {accepted:false,reason:'unsupported_service'};
+ if(device.subscription?.endpoint!==device.endpoint)return {accepted:false,reason:'invalid_subscription'};
+ let payload;
+ try{payload=await buildPushPayload({data:JSON.stringify(message),options:{ttl:3600}},device.subscription,{subject:env.VAPID_SUBJECT,publicKey:env.VAPID_PUBLIC_KEY,privateKey:env.VAPID_PRIVATE_KEY})}catch{return {accepted:false,reason:'encryption'}}
+ let response;try{response=await fetch(device.endpoint,{...payload,redirect:'error',signal:AbortSignal.timeout(15000)})}catch{return {accepted:false,reason:'network'}}
+ if(response.status===404||response.status===410){await db(env,`push_subscriptions?id=eq.${encodeURIComponent(device.id)}`,{method:'DELETE',headers:{Prefer:'return=minimal'}});return {accepted:false,reason:'expired',status:response.status}}
+ return {accepted:response.ok,reason:response.ok?'accepted':'rejected',status:response.status};
+}
+function deliveryError(results){
+ const failure=results.find(r=>r.status==='fulfilled')?.value;
+ if(!failure)return 'Push delivery failed inside the Worker. Check Worker logs and retry.';
+ if(failure.reason==='expired')return 'The saved device subscription has expired. Disconnect this device, enable notifications again, then retry.';
+ if(failure.reason==='unsupported_service')return 'This browser uses an unsupported push-service address. Try Chrome, Firefox, Edge, or an installed iPhone Home Screen app.';
+ if(failure.reason==='invalid_subscription'||failure.reason==='encryption')return 'The saved device subscription could not be encrypted. Disconnect this device and enable notifications again.';
+ if(failure.reason==='network')return 'The Worker could not reach the browser push service. Retry later; check Worker logs if this continues.';
+ if(failure.status===401||failure.status===403)return `The browser push service rejected authentication (HTTP ${failure.status}). Check VAPID_SUBJECT uses your real mailto: email, then disconnect and reconnect this device with the current keys.`;
+ return `The browser push service rejected the notification (HTTP ${failure.status}). Disconnect this device and reconnect; share this status if it continues.`;
 }
 export async function runSchedule(env,now=new Date()){
  // Pagination supports more users without silently ignoring rows beyond PostgREST's cap.
@@ -46,7 +69,7 @@ export async function runSchedule(env,now=new Date()){
    const slot=`hour:${now.toISOString().slice(0,13)}:${String(now.getUTCMinutes()).padStart(2,'0')}`;
    if(!await claim(env,setting.user_id,slot))continue;
    const results=await Promise.allSettled(subscriptions.map(device=>send(env,device,summary(plan,now))));
-   if(results.some(r=>r.status==='rejected'||!r.value))console.warn('Some hourly notifications were not delivered.');
+   if(results.some(r=>r.status==='rejected'||!r.value.accepted))console.warn('Some hourly notifications were not delivered.');
   }catch{console.error('A scheduled notification could not be processed.')}
  }
  if(settings.length<100)break;
@@ -74,9 +97,10 @@ export default {
    if(!auth.ok)return json({error:'Your login has expired. Log in again.'},401,origin);
    const user=await auth.json();
    const list=await devices(env,user.id);if(!list.length)return json({error:'Enable notifications on a device first.'},400,origin);
+   if(!await vapidKeysMatch(env))return json({error:'VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY do not match. Copy both from the same notification keys file into Worker runtime settings.'},503,origin);
    if(!await claim(env,user.id,`test:${Math.floor(Date.now()/60000)}`))return json({error:'Please wait a minute before another test.'},429,origin);
    const results=await Promise.allSettled(list.map(device=>send(env,device,{title:'Dayline is connected',body:'Your hourly progress updates will arrive here.',tag:'dayline-test'})));
-   if(!results.some(r=>r.status==='fulfilled'&&r.value))return json({error:'No device accepted the notification. Reconnect this device and retry.'},502,origin);
+   if(!results.some(r=>r.status==='fulfilled'&&r.value.accepted))return json({error:deliveryError(results)},502,origin);
    return json({sent:true},200,origin);
   }catch(error){
    if(error.stage==='database'){
