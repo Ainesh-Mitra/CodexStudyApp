@@ -11,8 +11,19 @@ export function validatePlan(value){
  for(let day=0;day<7;day++){const tasks=value.tasks.filter(t=>t.day===day).sort((a,b)=>a.start-b.start);for(let i=1;i<tasks.length;i++)if(tasks[i].start<tasks[i-1].end)throw Error('Tasks overlap.');}
  return value;
 }
+// Leave room for JSON metadata inside Web Push's encrypted payload limit.
+function taskList(tasks,empty){
+ if(!tasks.length)return `• ${empty}`;
+ let result='';
+ for(let i=0;i<tasks.length;i++){
+  const line=`• ${tasks[i].title.replace(/\s+/g,' ').trim()}`;
+  if(new TextEncoder().encode(JSON.stringify(result+'\n'+line)).length>1300){return result+`\n• +${tasks.length-i} more (open planner)`}
+  result+=(result?'\n':'')+line;
+ }
+ return result;
+}
 export function summary(plan,now=new Date()){
- const local=dateParts(now,plan.timezone),tasks=plan.tasks.filter(t=>t.day===local.weekday).sort((a,b)=>a.start-b.start),done=tasks.filter(t=>t.completedOn===local.date).length;
- const next=tasks.find(t=>t.end>local.hour*4+Math.floor(local.minute/15)&&t.completedOn!==local.date);
- return {title:'Your Dayline update',body:`${done} of ${tasks.length} tasks complete. ${tasks.length-done} remaining.${next?` Next: ${next.title.slice(0,80)}.`:''}`,tag:`dayline-${local.date}-${local.hour}`,url:'/'};
+ const local=dateParts(now,plan.timezone),tasks=plan.tasks.filter(t=>t.day===local.weekday).sort((a,b)=>a.start-b.start);
+ const done=tasks.filter(t=>t.completedOn===local.date),remaining=tasks.filter(t=>t.completedOn!==local.date);
+ return {title:'Your daily progress',body:tasks.length?`✅ Done\n${taskList(done,'Nothing yet')}\n\n⏳ Left to do\n${taskList(remaining,'Nothing left — all done!')}`:'No tasks scheduled today.',tag:`dayline-${local.date}-${local.hour}`,url:'/'};
 }

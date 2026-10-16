@@ -128,6 +128,8 @@ URLs; expired endpoints are deleted. Hourly sends are deduplicated per account
 and UTC hour/quarter-hour; a failed send is not automatically replayed, to avoid
 sending duplicate hourly updates. Deduplication rows are purged after seven days.
 
+Hourly notifications list **Done** tasks and **Left to do** tasks for the current day, using task titles in schedule order. Empty days say no tasks are scheduled. Very long lists show an omitted-task count so the encrypted message stays within push payload limits; phone operating systems may also shorten the displayed text.
+
 ## Verification
 
 ```sh
