@@ -6,7 +6,18 @@ export function allowedEndpoint(endpoint){
  u.hostname==='fcm.googleapis.com'||u.hostname==='updates.push.services.mozilla.com'||u.hostname==='web.push.apple.com'||u.hostname.endsWith('.notify.windows.com'))}catch{return false}
 }
 export function inHours(hour,start,end){return start<=end?hour>=start&&hour<=end:hour>=start||hour<=end}
-function json(data,status=200,origin=''){return new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':origin,'Vary':'Origin','Cache-Control':'no-store'}})}
+function json(data,status=200,origin=''){return new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json',...(origin?{'Access-Control-Allow-Origin':origin}:{}),'Vary':'Origin','Cache-Control':'no-store'}})}
+function appOrigin(value){try{const url=new URL(value.trim());return ['https:','http:'].includes(url.protocol)&&url.pathname==='/'&&!url.search&&!url.hash&&!url.username&&!url.password?url.origin:null}catch{return null}}
+function configuration(env){
+ const required=['SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','APP_ORIGIN','VAPID_PUBLIC_KEY','VAPID_PRIVATE_KEY','VAPID_SUBJECT'];
+ const missing=required.filter(name=>!String(env[name]||'').trim());
+ const invalid=[];
+ if(env.APP_ORIGIN&&!appOrigin(env.APP_ORIGIN))invalid.push('APP_ORIGIN');
+ if(env.SUPABASE_URL){try{const url=new URL(env.SUPABASE_URL);if(url.protocol!=='https:'||url.pathname!=='/'||url.search||url.hash)invalid.push('SUPABASE_URL')}catch{invalid.push('SUPABASE_URL')}}
+ if(env.VAPID_PUBLIC_KEY&&!/^[A-Za-z0-9_-]{87}$/.test(env.VAPID_PUBLIC_KEY))invalid.push('VAPID_PUBLIC_KEY');
+ if(env.VAPID_PRIVATE_KEY&&!/^[A-Za-z0-9_-]{43}$/.test(env.VAPID_PRIVATE_KEY))invalid.push('VAPID_PRIVATE_KEY');
+ return {service:'dayline-push',configuration:missing.length||invalid.length?'needs_configuration':'configured',allowedOrigin:appOrigin(env.APP_ORIGIN),missing,invalid};
+}
 async function db(env,path,options={}){
  const response=await fetch(`${env.SUPABASE_URL}/rest/v1/${path}`,{...options,headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,Authorization:`Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,'Content-Type':'application/json',...options.headers},signal:AbortSignal.timeout(15000)});
  if(!response.ok){const error=new Error('Database operation failed');error.status=response.status;throw error}
@@ -45,13 +56,20 @@ export async function runSchedule(env,now=new Date()){
 }
 export default {
  async fetch(request,env){
-  const origin=request.headers.get('Origin');if(origin!==env.APP_ORIGIN)return json({error:'Origin not allowed.'},403);
+  const path=new URL(request.url).pathname;
+  // Non-secret diagnostics are readable directly; they do not test credentials or expose keys.
+  if(path==='/health'&&request.method==='GET')return json(configuration(env));
+  const origin=request.headers.get('Origin'),allowed=appOrigin(env.APP_ORIGIN);
+  if(!allowed||origin!==allowed)return json({error:'Origin not allowed. Check APP_ORIGIN in the Worker runtime settings.'},403);
   if(request.method==='OPTIONS')return new Response(null,{status:204,headers:{'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Methods':'GET, POST, OPTIONS','Access-Control-Allow-Headers':'Authorization, Content-Type','Vary':'Origin'}});
   try{
-   const path=new URL(request.url).pathname;
-   if(path==='/public-key'&&request.method==='GET')return json({publicKey:env.VAPID_PUBLIC_KEY},200,origin);
+   if(path==='/public-key'&&request.method==='GET'){
+    if(!/^[A-Za-z0-9_-]{87}$/.test(env.VAPID_PUBLIC_KEY||''))return json({error:'VAPID_PUBLIC_KEY is missing or invalid in Worker runtime settings. Check /health.'},503,origin);
+    return json({publicKey:env.VAPID_PUBLIC_KEY},200,origin);
+   }
    if(path!=='/test'||request.method!=='POST')return json({error:'Not found.'},404,origin);
    const authorization=request.headers.get('Authorization')||'';if(!authorization.startsWith('Bearer '))return json({error:'Log in first.'},401,origin);
+   if(configuration(env).configuration!=='configured')return json({error:'Worker runtime settings are missing or invalid. Open the Worker /health address to see which settings need attention.'},503,origin);
    const auth=await fetch(`${env.SUPABASE_URL}/auth/v1/user`,{headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,Authorization:authorization},signal:AbortSignal.timeout(15000)});
    if(!auth.ok)return json({error:'Your login has expired. Log in again.'},401,origin);
    const user=await auth.json();

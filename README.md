@@ -130,6 +130,8 @@ sending duplicate hourly updates. Deduplication rows are purged after seven days
 
 Hourly notifications list **Done** tasks and **Left to do** tasks for the current day, using task titles in schedule order. Empty days say no tasks are scheduled. Very long lists show an omitted-task count so the encrypted message stays within push payload limits; phone operating systems may also shorten the displayed text.
 
+Worker configuration explicitly sets `APP_ORIGIN` to `https://codexstudyapp.pages.dev`. If hosting on a different address, update `[vars]` in `worker/wrangler.toml`. The public `/health` endpoint lists missing/invalid runtime variable names and the allowed website origin, but never exposes keys. A `configured` result checks configuration shape only, not live database access or physical-phone delivery.
+
 ## Verification
 
 ```sh

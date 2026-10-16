@@ -4,6 +4,10 @@ compatibility_date = "2026-10-01"
 # Preserve runtime variables managed in the Cloudflare dashboard.
 keep_vars = true
 
+# This public origin is versioned so deployments reliably allow the live website.
+[vars]
+APP_ORIGIN = "https://codexstudyapp.pages.dev"
+
 [triggers]
 crons = ["*/15 * * * *"]
 

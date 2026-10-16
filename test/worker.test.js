@@ -15,3 +15,13 @@ test('scheduler encrypts pushes, isolates users, deduplicates retries and remove
  try{await runSchedule(env,new Date('2026-10-16T03:15:00Z'));assert.equal(deliveries,1);assert.equal(removed,true);await runSchedule(env,new Date('2026-10-16T03:15:00Z'));assert.equal(deliveries,1);await runSchedule(env,new Date('2026-10-16T03:30:00Z'));assert.equal(deliveries,1)}finally{globalThis.fetch=original}
 });
 test('test notification API rejects foreign origins and missing authentication',async()=>{const env={APP_ORIGIN:'https://planner.test'};assert.equal((await worker.fetch(new Request('https://push.test/test',{method:'POST',headers:{Origin:'https://evil.test'}}),env)).status,403);assert.equal((await worker.fetch(new Request('https://push.test/test',{method:'POST',headers:{Origin:env.APP_ORIGIN}}),env)).status,401)});
+test('browser preflight allows the configured website and rejects other origins',async()=>{
+ const env={APP_ORIGIN:' https://codexstudyapp.pages.dev/ '};
+ const preflight=await worker.fetch(new Request('https://push.test/public-key',{method:'OPTIONS',headers:{Origin:'https://codexstudyapp.pages.dev','Access-Control-Request-Method':'GET','Access-Control-Request-Headers':'authorization,content-type'}}),env);
+ assert.equal(preflight.status,204);assert.equal(preflight.headers.get('Access-Control-Allow-Origin'),'https://codexstudyapp.pages.dev');assert.match(preflight.headers.get('Access-Control-Allow-Headers'),/Authorization/);
+ const foreign=await worker.fetch(new Request('https://push.test/public-key',{method:'OPTIONS',headers:{Origin:'https://other.test'}}),env);assert.equal(foreign.status,403);assert.equal(foreign.headers.get('Access-Control-Allow-Origin'),null);
+ const error=await worker.fetch(new Request('https://push.test/public-key',{headers:{Origin:'https://codexstudyapp.pages.dev'}}),env);assert.equal(error.status,503);assert.equal(error.headers.get('Access-Control-Allow-Origin'),'https://codexstudyapp.pages.dev');assert.match((await error.json()).error,/VAPID_PUBLIC_KEY/);
+});
+test('health identifies missing runtime variables without revealing credentials',async()=>{
+ const response=await worker.fetch(new Request('https://push.test/health'),{APP_ORIGIN:'https://codexstudyapp.pages.dev',SUPABASE_SERVICE_ROLE_KEY:'do-not-expose'});assert.equal(response.status,200);const text=await response.text();assert.ok(!text.includes('do-not-expose'));const data=JSON.parse(text);assert.equal(data.allowedOrigin,'https://codexstudyapp.pages.dev');assert.ok(data.missing.includes('VAPID_PUBLIC_KEY'));assert.equal(data.configuration,'needs_configuration');
+});
