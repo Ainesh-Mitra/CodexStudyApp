@@ -9,7 +9,7 @@ keep_vars = true
 APP_ORIGIN = "https://codexstudyapp.pages.dev"
 
 [triggers]
-crons = ["*/15 * * * *"]
+crons = ["* * * * *"]
 
 # Configure all variables/secrets with Wrangler or the dashboard. Do not put
 # the service-role key or VAPID private key in Pages build variables.

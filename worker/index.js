@@ -1,5 +1,6 @@
+import { scheduledNotifications } from '../src/notifications.js';
 import { buildPushPayload } from '@block65/webcrypto-web-push';
-import { dateParts, summary, validatePlan } from '../src/model.js';
+import { validatePlan } from '../src/model.js';
 
 export function allowedEndpoint(endpoint){
  try{const u=new URL(endpoint);return u.protocol==='https:'&&!u.username&&!u.password&&!u.port&&(
@@ -65,20 +66,22 @@ export async function runSchedule(env,now=new Date()){
  for(let offset=0;;offset+=100){
  const settings=await db(env,`notification_settings?enabled=eq.true&select=*&order=user_id&limit=100&offset=${offset}`);
  for(const setting of settings){
-  try{const local=dateParts(now,setting.timezone);if(local.minute!==0||!inHours(local.hour,setting.start_hour,setting.end_hour))continue;
+  try{if(setting.mode==='never')continue;
    const plans=await db(env,`planners?user_id=eq.${setting.user_id}&select=data`);if(!plans.length)continue;
    const plan=validatePlan(plans[0].data);if(plan.timezone!==setting.timezone)continue;
+   const pending=scheduledNotifications(setting,plan,now);if(!pending.length)continue;
    const subscriptions=await devices(env,setting.user_id);if(!subscriptions.length)continue;
-   const slot=`hour:${now.toISOString().slice(0,13)}:${String(now.getUTCMinutes()).padStart(2,'0')}`;
-   if(!await claim(env,setting.user_id,slot))continue;
-   const results=await Promise.allSettled(subscriptions.map(device=>send(env,device,summary(plan,now))));
-   if(results.some(r=>r.status==='rejected'||!r.value.accepted))console.warn('Some hourly notifications were not delivered.');
+   for(const notification of pending){
+    if(!await claim(env,setting.user_id,notification.slot))continue;
+    const results=await Promise.allSettled(subscriptions.map(device=>send(env,device,notification.message)));
+    if(results.some(r=>r.status==='rejected'||!r.value.accepted))console.warn('Some scheduled notifications were not delivered.');
+   }
   }catch{console.error('A scheduled notification could not be processed.')}
  }
  if(settings.length<100)break;
  }
  // Keep the free database small. Retain a week of deduplication records.
- await db(env,`push_deliveries?created_at=lt.${encodeURIComponent(new Date(now.getTime()-7*86400000).toISOString())}`,{method:'DELETE',headers:{Prefer:'return=minimal'}});
+ if(now.getUTCHours()===0&&now.getUTCMinutes()===0)await db(env,`push_deliveries?created_at=lt.${encodeURIComponent(new Date(now.getTime()-7*86400000).toISOString())}`,{method:'DELETE',headers:{Prefer:'return=minimal'}});
 }
 export default {
  async fetch(request,env){
@@ -102,7 +105,7 @@ export default {
    const list=await devices(env,user.id);if(!list.length)return json({error:'Enable notifications on a device first.'},400,origin);
    if(!await vapidKeysMatch(env))return json({error:'VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY do not match. Copy both from the same notification keys file into Worker runtime settings.'},503,origin);
    if(!await claim(env,user.id,`test:${Math.floor(Date.now()/60000)}`))return json({error:'Please wait a minute before another test.'},429,origin);
-   const results=await Promise.allSettled(list.map(device=>send(env,device,{title:'Dayline is connected',body:'Your hourly progress updates will arrive here.',tag:'dayline-test'})));
+   const results=await Promise.allSettled(list.map(device=>send(env,device,{title:'Dayline is connected',body:'Your scheduled updates will arrive here.',tag:'dayline-test'})));
    if(!results.some(r=>r.status==='fulfilled'&&r.value.accepted))return json({error:deliveryError(results)},502,origin);
    return json({sent:true},200,origin);
   }catch(error){

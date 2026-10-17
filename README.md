@@ -1,6 +1,6 @@
 # Dayline
 
-A repeating weekly planner with private account saves and hourly web push updates.
+A repeating weekly planner with private account saves and configurable web push updates.
 
 ## Run locally
 
@@ -34,9 +34,9 @@ IANA time zone, resets at midnight, and is rechecked after waking the device.
 
 Cloudflare Pages serves `dist`. Supabase Auth handles logins, and its PostgreSQL
 database stores one weekly planner per user with row-level security. A Cloudflare
-Worker runs every 15 minutes, checks local hours, and sends encrypted Web Push
-messages only at each user's full local hour. This supports half- and quarter-hour
-UTC offsets as well as daylight saving time. No SMS, paid domain, or paid plan is
+Worker runs once per minute and sends encrypted Web Push messages when an
+interval update or five-minute task reminder is due. Intervals use elapsed time;
+task reminders use the schedule's time zone, including midnight and DST transitions. No SMS, paid domain, or paid plan is
 required for a small personal deployment. Provider quotas and free-plan terms
 still apply; verify current plans when creating accounts and leave paid upgrades
 disabled. Free projects can pause or have quotas, so delivery is best effort.
@@ -89,7 +89,7 @@ Cloudflare account, set the three public build variables in your shell, and run
 `npm run deploy:web`. `.env.example` lists names only; the build reads process
 environment variables and does not automatically load `.env` files.
 
-## 3. Configure hourly phone notifications
+## 3. Configure phone notifications
 
 1. Run `npm run keys` once. This creates an ignored, permission-restricted
    `.data/vapid.json`. Preserve the keys securely; changing them requires reconnecting
@@ -114,21 +114,31 @@ environment variables and does not automatically load `.env` files.
 5. On the exact phone you want to notify, open your Pages website and log in.
    On iPhone (iOS 16.4+), add the website to the Home Screen and open it there first.
 6. Open **Notifications**, tap **Enable notifications on this device**, and allow
-   permission. Enable hourly updates and save. Default hours cover the entire day;
-   you can also set a narrower or overnight range.
+   permission. Choose **Never**, **Every N hours** (whole numbers from 1 to 24),
+   or **5 minutes before the next item**, then save. The default is Never.
 7. Tap **Send test notification**. Test delivery is limited to once a minute per
-   account. Confirm it appears on the phone, then verify the next real hourly update.
+   account. Confirm it appears on the phone, then verify an automatic notification with your chosen mode.
 
 Connect every desired device separately. Logging out disconnects that browser's
 push subscription. You can also disconnect it from notification settings. Your
 phone number is never used. Browser support, network access, and OS notification
 settings can delay or suppress delivery. No guarantee of exact-to-the-minute
-arrival is made. A failed hourly delivery is logged without exposing subscription
-URLs; expired endpoints are deleted. Hourly sends are deduplicated per account
-and UTC hour/quarter-hour; a failed send is not automatically replayed, to avoid
-sending duplicate hourly updates. Deduplication rows are purged after seven days.
+arrival is made. A failed delivery is logged without exposing subscription
+URLs; expired endpoints are deleted. Interval sends are deduplicated per account
+and UTC minute; task reminders are deduplicated by local date, task, and start
+time so repeated DST hours do not send duplicate reminders. A failed send is not
+automatically replayed. Deduplication rows are purged daily after seven days.
 
-Hourly notifications list **Done** tasks and **Left to do** tasks for the current day, using task titles in schedule order. Empty days say no tasks are scheduled. Very long lists show an omitted-task count so the encrypted message stays within push payload limits; phone operating systems may also shorten the displayed text.
+Interval notifications list **Done** tasks and **Left to do** tasks for the current day, using task titles in schedule order. Empty days say no tasks are scheduled. Very long lists show an omitted-task count so the encrypted message stays within push payload limits; phone operating systems may also shorten the displayed text.
+
+For an existing deployment, run **supabase/notification-modes.sql** once in the
+Supabase SQL Editor before using the new modes. New projects get these columns
+from schema.sql. This migration is additive and rerunnable. Redeploy the Worker
+so its cron trigger changes to `* * * * *`. Interval timing starts from the minute
+you save a new mode or interval, with the first update after N hours; saving an
+unchanged interval keeps its anchor. Five-minute reminders skip completed tasks
+and include the upcoming item's title/subject plus that day's progress list.
+Never disables automatic sends without disconnecting devices or disabling tests.
 
 Worker configuration explicitly sets `APP_ORIGIN` to `https://codexstudyapp.pages.dev`. If hosting on a different address, update `[vars]` in `worker/wrangler.toml`. The public `/health` endpoint lists missing/invalid runtime variable names and the allowed website origin, but never exposes keys. A `configured` result checks configuration shape only, not live database access or physical-phone delivery.
 

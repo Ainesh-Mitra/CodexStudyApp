@@ -4,6 +4,7 @@ test('database isolates two accounts and rejects stale writes and anonymous acce
  try{
  await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;grant usage on schema auth to authenticated;insert into auth.users values('${alice}'),('${bob}');`);
  await db.exec(await readFile(new URL('../supabase/schema.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../supabase/notification-modes.sql',import.meta.url),'utf8'));
  const asUser=async id=>{await db.exec(`reset role;set role authenticated;set request.jwt.claim.sub='${id}';`)};
  await asUser(alice);assert.equal((await db.query(`select public.save_planner($1::jsonb,0) as revision`,[JSON.stringify({private:'alice'})])).rows[0].revision,1);
  await db.query(`insert into public.notification_settings(user_id) values($1)`,[alice]);
@@ -12,6 +13,9 @@ test('database isolates two accounts and rejects stale writes and anonymous acce
  await assert.rejects(db.query(`insert into public.notification_settings(user_id) values($1)`,[alice]),/row-level security/);
  await db.query(`select public.save_planner('{"private":"bob"}',0)`);assert.equal((await db.query('select data from public.planners')).rows[0].data.private,'bob');
  await asUser(alice);await db.query(`select public.save_planner('{"private":"alice updated"}',1)`);await assert.rejects(db.query(`select public.save_planner('{}',1)`),/revision_conflict/);assert.equal((await db.query('select data from public.planners')).rows[0].data.private,'alice updated');
+ await db.query(`update public.notification_settings set mode='before_task',interval_hours=2 where user_id=$1`,[alice]);
+ await assert.rejects(db.query(`update public.notification_settings set interval_hours=0 where user_id=$1`,[alice]),/check constraint/);
+ await assert.rejects(db.query(`update public.notification_settings set mode='invalid' where user_id=$1`,[alice]),/check constraint/);
  await assert.rejects(db.query(`insert into public.push_deliveries(user_id,slot) values($1,'fake')`,[alice]),/permission denied/);
  await db.exec('reset role;set role service_role');
  assert.equal((await db.query('select * from public.planners')).rows.length,2);
