@@ -39,13 +39,14 @@ test('test push distinguishes push-service authentication rejection from an expi
  globalThis.fetch=async(url,options={})=>{
   const u=new URL(url);if(u.hostname==='fcm.googleapis.com')return new Response(null,{status:pushStatus});
   if(u.pathname.endsWith('/user'))return Response.json({id:'alice'});
+  if(u.pathname.endsWith('/planners'))return Response.json([]);
   if(u.pathname.endsWith('/push_subscriptions')){if(options.method==='DELETE'){deleted=true;return new Response(null,{status:204})}return Response.json([{id:'device',endpoint:'https://fcm.googleapis.com/x',subscription:{endpoint:'https://fcm.googleapis.com/x',keys:{p256dh:recipient.publicKey,auth:Buffer.alloc(16,1).toString('base64url')}}}])}
   if(u.pathname.endsWith('/push_deliveries'))return new Response(null,{status:201});throw Error('Unexpected request');
  };
  try{
-  const request=()=>new Request('https://push.test/test',{method:'POST',headers:{Origin:env.APP_ORIGIN,Authorization:'Bearer user-token'}});
+  const request=mode=>new Request('https://push.test/test',{method:'POST',headers:{Origin:env.APP_ORIGIN,Authorization:'Bearer user-token'},...(mode?{body:JSON.stringify({mode,interval_hours:2})}:{})});
   let response=await worker.fetch(request(),env);assert.equal(response.status,502);assert.match((await response.json()).error,/authentication \(HTTP 403\)/);assert.equal(deleted,false);
   pushStatus=410;response=await worker.fetch(request(),env);assert.equal(response.status,502);assert.match((await response.json()).error,/expired/);assert.equal(deleted,true);
-  pushStatus=201;response=await worker.fetch(request(),env);assert.equal(response.status,200);assert.equal((await response.json()).sent,true);
+  pushStatus=201;for(const mode of ['never','interval','before_task']){response=await worker.fetch(request(mode),env);assert.equal(response.status,200);const data=await response.json();assert.equal(data.sent,true);assert.match(data.example.title,/^Example/);if(mode==='before_task')assert.match(data.example.title,/15 minutes/);if(mode==='never')assert.match(data.example.body,/not receive automatic/)}
  }finally{globalThis.fetch=original}
 });

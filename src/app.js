@@ -1,4 +1,4 @@
-import { validInterval } from './notifications.js';
+import { validInterval, REMINDER_MINUTES } from './notifications.js';
 import { pushBaseUrl, readPushResponse } from './push-client.js';
 import { createClient } from '@supabase/supabase-js';
 import { dateParts, validatePlan, emptyPlan } from './model.js';
@@ -224,11 +224,11 @@ let loadedNotificationSettings=null;
 function notificationMode(){return document.querySelector('input[name="notification-mode"]:checked').value}
 function updateNotificationControls(){
  const mode=notificationMode();document.querySelector('#interval-hours').disabled=mode!=='interval';
- document.querySelector('#notification-timing').textContent=mode==='never'?'Automatic notifications are off. Test notifications can still be sent.':mode==='interval'?'Daily progress summaries repeat at this interval, starting after you save. Choose 1–24 whole hours.':'A reminder is scheduled 5 minutes before each unfinished item, using '+plan.timezone+'. Phone delivery can be delayed.';
+ document.querySelector('#notification-timing').textContent=mode==='never'?'Automatic notifications are off. Test notifications can still be sent.':mode==='interval'?'Daily progress summaries repeat at this interval, starting after you save. Choose 1–24 whole hours.':`A reminder is scheduled ${REMINDER_MINUTES} minutes before each unfinished item, using `+plan.timezone+'. Phone delivery can be delayed.';
 }
 for(const radio of document.querySelectorAll('input[name="notification-mode"]'))radio.addEventListener('change',updateNotificationControls);
 document.querySelector('#notifications-button').addEventListener('click',async()=>{
- document.querySelector('#notifications-dialog').showModal();document.querySelector('input[name="notification-mode"][value="never"]').checked=true;document.querySelector('#interval-hours').value='1';loadedNotificationSettings=null;updateNotificationControls();document.querySelector('#save-notifications').disabled=true;
+ document.querySelector('#notifications-dialog').showModal();document.querySelector('#notification-preview').hidden=true;document.querySelector('input[name="notification-mode"][value="never"]').checked=true;document.querySelector('#interval-hours').value='1';loadedNotificationSettings=null;updateNotificationControls();document.querySelector('#save-notifications').disabled=true;
  try{requireCloud();const {data,error}=await cloud.from('notification_settings').select('*').eq('user_id',user.id).maybeSingle();if(error)throw error;
   loadedNotificationSettings=data;const mode=data?.enabled?(data.mode||'interval'):'never';document.querySelector(`input[name="notification-mode"][value="${['never','interval','before_task'].includes(mode)?mode:'never'}"]`).checked=true;document.querySelector('#interval-hours').value=data?.interval_hours||1;updateNotificationControls();pushStatus('Settings use '+plan.timezone+'. Connect each device you want to notify.');
  }catch(error){pushStatus(error.message)}finally{document.querySelector('#save-notifications').disabled=false}
@@ -241,11 +241,18 @@ async function saveNotificationSettings(){
  const settings={user_id:user.id,enabled:mode!=='never',mode,interval_hours:mode==='interval'?hours:loadedNotificationSettings?.interval_hours||1,interval_anchor:anchor,timezone:plan.timezone,start_hour:0,end_hour:23};
  const {error}=await cloud.from('notification_settings').upsert(settings);
  if(error){if(['PGRST204','42703'].includes(error.code))throw Error('The database needs the notification update. Run supabase/notification-modes.sql in Supabase SQL Editor, then save again.');throw error}
- loadedNotificationSettings=settings;pushStatus(mode==='never'?'Saved. Automatic notifications are off.':mode==='interval'?`Saved. Progress updates repeat every ${hours} ${hours===1?'hour':'hours'}.`:'Saved. Reminders are scheduled 5 minutes before unfinished tasks.');
+ loadedNotificationSettings=settings;pushStatus(mode==='never'?'Saved. Automatic notifications are off.':mode==='interval'?`Saved. Progress updates repeat every ${hours} ${hours===1?'hour':'hours'}.`:`Saved. Reminders are scheduled ${REMINDER_MINUTES} minutes before unfinished tasks.`);
 }
 async function enableDevice(){requireCloud();if(!isSecureContext||!('PushManager' in window)||!('Notification' in window))throw Error('This browser does not support push here. On iPhone, open the installed Home Screen app.');const permission=await Notification.requestPermission();if(permission!=='granted')throw Error('Notifications were not allowed. Enable them in your phone or browser settings.');const key=await pushRequest('/public-key');const reg=registration||await navigator.serviceWorker.ready;let sub=await reg.pushManager.getSubscription();if(!sub){const bytes=Uint8Array.from(atob(key.publicKey.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0));sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:bytes})}const {error}=await cloud.from('push_subscriptions').upsert({user_id:user.id,endpoint:sub.endpoint,subscription:sub.toJSON()},{onConflict:'user_id,endpoint'});if(error)throw error;pushStatus('This device is connected. Choose when to receive notifications and save settings.');}
 async function disconnectDevice(show=true){if(!user||!cloud)return;const reg=registration||await navigator.serviceWorker?.getRegistration();const sub=await reg?.pushManager.getSubscription();if(sub){const {error}=await cloud.from('push_subscriptions').delete().eq('user_id',user.id).eq('endpoint',sub.endpoint);if(error)throw error;await sub.unsubscribe()}if(show)pushStatus('This device is disconnected.');}
-for(const [id,action] of [['enable-device',enableDevice],['disable-device',()=>disconnectDevice()],['test-push',async()=>{await pushRequest('/test',{method:'POST'});pushStatus('Test sent. Check your phone’s notification center.')}],['save-notifications',saveNotificationSettings]] )document.getElementById(id).addEventListener('click',async e=>{e.currentTarget.disabled=true;try{await action()}catch(error){pushStatus(error.message)}finally{document.getElementById(id).disabled=false}});
+for(const [id,action] of [['enable-device',enableDevice],['disable-device',()=>disconnectDevice()],['test-push',async()=>{
+ const mode=notificationMode(),hours=Number(document.querySelector('#interval-hours').value);
+ if(mode==='interval'&&!validInterval(hours))throw Error('Enter a whole number of hours from 1 to 24.');
+ document.querySelector('#notification-preview').hidden=true;
+ const result=await pushRequest('/test',{method:'POST',body:JSON.stringify({mode,interval_hours:mode==='interval'?hours:1})});
+ if(result.example){document.querySelector('#preview-title').textContent=result.example.title;document.querySelector('#preview-body').textContent=result.example.body;document.querySelector('#notification-preview').hidden=false}
+ pushStatus('Test sent. This is an example of your selected notification option.');
+ }],['save-notifications',saveNotificationSettings]] )document.getElementById(id).addEventListener('click',async e=>{e.currentTarget.disabled=true;try{await action()}catch(error){pushStatus(error.message)}finally{document.getElementById(id).disabled=false}});
 
 renderPlan(readCache()?.plan||emptyPlan());
 if(cloud){hydrating=true;cloud.auth.getSession().then(({data,error})=>{if(error)throw error;return loadAccount(data.session?.user||null)}).catch(()=>{hydrating=false;saveStatus('Could not restore login. Log in to sync.',true)});cloud.auth.onAuthStateChange((event,session)=>{if(event==='PASSWORD_RECOVERY')setTimeout(()=>document.querySelector('#recovery-dialog').showModal(),0);if(['SIGNED_IN','SIGNED_OUT'].includes(event))setTimeout(()=>loadAccount(session?.user||null),0)})}else{saveStatus('Saved on this device · Cloud login not configured')}

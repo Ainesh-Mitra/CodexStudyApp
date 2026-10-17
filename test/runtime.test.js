@@ -16,6 +16,7 @@ test('Cloudflare runtime sends an encrypted test push and does not follow redire
   }
   if(url.hostname==='database.test'){
    if(url.pathname==='/auth/v1/user')return RuntimeResponse.json({id:'alice'});
+   if(url.pathname==='/rest/v1/planners')return RuntimeResponse.json([]);
    if(url.pathname==='/rest/v1/push_subscriptions')return RuntimeResponse.json([{id:'device',endpoint:'https://fcm.googleapis.com/fcm/send/test-device',subscription:{endpoint:'https://fcm.googleapis.com/fcm/send/test-device',keys:{p256dh:recipient.publicKey,auth:Buffer.alloc(16,1).toString('base64url')}}}]);
    if(url.pathname==='/rest/v1/push_deliveries')return new RuntimeResponse(null,{status:201});
   }

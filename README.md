@@ -35,7 +35,7 @@ IANA time zone, resets at midnight, and is rechecked after waking the device.
 Cloudflare Pages serves `dist`. Supabase Auth handles logins, and its PostgreSQL
 database stores one weekly planner per user with row-level security. A Cloudflare
 Worker runs once per minute and sends encrypted Web Push messages when an
-interval update or five-minute task reminder is due. Intervals use elapsed time;
+interval update or fifteen-minute task reminder is due. Intervals use elapsed time;
 task reminders use the schedule's time zone, including midnight and DST transitions. No SMS, paid domain, or paid plan is
 required for a small personal deployment. Provider quotas and free-plan terms
 still apply; verify current plans when creating accounts and leave paid upgrades
@@ -115,8 +115,8 @@ environment variables and does not automatically load `.env` files.
    On iPhone (iOS 16.4+), add the website to the Home Screen and open it there first.
 6. Open **Notifications**, tap **Enable notifications on this device**, and allow
    permission. Choose **Never**, **Every N hours** (whole numbers from 1 to 24),
-   or **5 minutes before the next item**, then save. The default is Never.
-7. Tap **Send test notification**. Test delivery is limited to once a minute per
+   or **15 minutes before the next item**, then save. The default is Never.
+7. Tap **Send test notification**. It previews the currently selected mode without changing saved settings. Tests are labeled Example, use your saved tasks when applicable (otherwise sample tasks), and show the delivered text in the dialog. Never previews a notifications-off message. Test delivery is limited to once a minute per
    account. Confirm it appears on the phone, then verify an automatic notification with your chosen mode.
 
 Connect every desired device separately. Logging out disconnects that browser's
@@ -136,7 +136,7 @@ Supabase SQL Editor before using the new modes. New projects get these columns
 from schema.sql. This migration is additive and rerunnable. Redeploy the Worker
 so its cron trigger changes to `* * * * *`. Interval timing starts from the minute
 you save a new mode or interval, with the first update after N hours; saving an
-unchanged interval keeps its anchor. Five-minute reminders skip completed tasks
+unchanged interval keeps its anchor. Fifteen-minute reminders skip completed tasks
 and include the upcoming item's title/subject plus that day's progress list.
 Never disables automatic sends without disconnecting devices or disabling tests.
 

@@ -1,6 +1,6 @@
-import { scheduledNotifications } from '../src/notifications.js';
+import { scheduledNotifications, exampleNotification, validInterval } from '../src/notifications.js';
 import { buildPushPayload } from '@block65/webcrypto-web-push';
-import { validatePlan } from '../src/model.js';
+import { validatePlan, emptyPlan } from '../src/model.js';
 
 export function allowedEndpoint(endpoint){
  try{const u=new URL(endpoint);return u.protocol==='https:'&&!u.username&&!u.password&&!u.port&&(
@@ -97,6 +97,9 @@ export default {
     return json({publicKey:env.VAPID_PUBLIC_KEY},200,origin);
    }
    if(path!=='/test'||request.method!=='POST')return json({error:'Not found.'},404,origin);
+   let options;try{const body=await request.text();if(body.length>1024)return json({error:'Test request is too large.'},413,origin);options=body?JSON.parse(body):{}}catch{return json({error:'Invalid test notification options.'},400,origin)}
+   const mode=options?.mode||'interval';
+   if(!['never','interval','before_task'].includes(mode)||mode==='interval'&&!validInterval(options?.interval_hours??1))return json({error:'Choose a notification mode and a whole interval from 1 to 24 hours.'},400,origin);
    const authorization=request.headers.get('Authorization')||'';if(!authorization.startsWith('Bearer '))return json({error:'Log in first.'},401,origin);
    if(configuration(env).configuration!=='configured')return json({error:'Worker runtime settings are missing or invalid. Open the Worker /health address to see which settings need attention.'},503,origin);
    const auth=await fetch(`${env.SUPABASE_URL}/auth/v1/user`,{headers:{apikey:env.SUPABASE_SERVICE_ROLE_KEY,Authorization:authorization},signal:AbortSignal.timeout(15000)});
@@ -104,10 +107,12 @@ export default {
    const user=await auth.json();
    const list=await devices(env,user.id);if(!list.length)return json({error:'Enable notifications on a device first.'},400,origin);
    if(!await vapidKeysMatch(env))return json({error:'VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY do not match. Copy both from the same notification keys file into Worker runtime settings.'},503,origin);
+   const saved=await db(env,`planners?user_id=eq.${encodeURIComponent(user.id)}&select=data`);
+   const example=exampleNotification(saved.length?validatePlan(saved[0].data):emptyPlan(),mode);
    if(!await claim(env,user.id,`test:${Math.floor(Date.now()/60000)}`))return json({error:'Please wait a minute before another test.'},429,origin);
-   const results=await Promise.allSettled(list.map(device=>send(env,device,{title:'Dayline is connected',body:'Your scheduled updates will arrive here.',tag:'dayline-test'})));
+   const results=await Promise.allSettled(list.map(device=>send(env,device,example)));
    if(!results.some(r=>r.status==='fulfilled'&&r.value.accepted))return json({error:deliveryError(results)},502,origin);
-   return json({sent:true},200,origin);
+   return json({sent:true,example},200,origin);
   }catch(error){
    if(error.stage==='database'){
     const message=error.status===403?'The Worker lacks database permissions. Run supabase/worker-permissions.sql in your Supabase SQL editor.':error.status===401?'Supabase rejected the backend key. Check SUPABASE_SERVICE_ROLE_KEY in Worker runtime settings.':error.status===404?'A notification database table is missing or unavailable. Run the latest supabase/schema.sql in your project.':`The notification database request failed (HTTP ${error.status}). Please retry later.`;
