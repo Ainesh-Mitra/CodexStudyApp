@@ -43,7 +43,9 @@ async function send(env,device,message){
  if(device.subscription?.endpoint!==device.endpoint)return {accepted:false,reason:'invalid_subscription'};
  let payload;
  try{payload=await buildPushPayload({data:JSON.stringify(message),options:{ttl:3600}},device.subscription,{subject:env.VAPID_SUBJECT,publicKey:env.VAPID_PUBLIC_KEY,privateKey:env.VAPID_PRIVATE_KEY})}catch{return {accepted:false,reason:'encryption'}}
- let response;try{response=await fetch(device.endpoint,{...payload,redirect:'error',signal:AbortSignal.timeout(15000)})}catch{return {accepted:false,reason:'network'}}
+ let response;try{response=await fetch(device.endpoint,{...payload,redirect:'manual',signal:AbortSignal.timeout(15000)})}catch{return {accepted:false,reason:'network'}}
+ // Workers supports manual/follow only; never forward VAPID credentials to a redirect.
+ if(response.status>=300&&response.status<400)return {accepted:false,reason:'redirect',status:response.status};
  if(response.status===404||response.status===410){await db(env,`push_subscriptions?id=eq.${encodeURIComponent(device.id)}`,{method:'DELETE',headers:{Prefer:'return=minimal'}});return {accepted:false,reason:'expired',status:response.status}}
  return {accepted:response.ok,reason:response.ok?'accepted':'rejected',status:response.status};
 }
@@ -53,6 +55,7 @@ function deliveryError(results){
  if(failure.reason==='expired')return 'The saved device subscription has expired. Disconnect this device, enable notifications again, then retry.';
  if(failure.reason==='unsupported_service')return 'This browser uses an unsupported push-service address. Try Chrome, Firefox, Edge, or an installed iPhone Home Screen app.';
  if(failure.reason==='invalid_subscription'||failure.reason==='encryption')return 'The saved device subscription could not be encrypted. Disconnect this device and enable notifications again.';
+ if(failure.reason==='redirect')return 'The browser push service redirected the request. Delivery was blocked to protect your device credentials. Disconnect this device and enable notifications again.';
  if(failure.reason==='network')return 'The Worker could not reach the browser push service. Retry later; check Worker logs if this continues.';
  if(failure.status===401||failure.status===403)return `The browser push service rejected authentication (HTTP ${failure.status}). Check VAPID_SUBJECT uses your real mailto: email, then disconnect and reconnect this device with the current keys.`;
  return `The browser push service rejected the notification (HTTP ${failure.status}). Disconnect this device and reconnect; share this status if it continues.`;

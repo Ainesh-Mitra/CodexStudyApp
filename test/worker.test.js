@@ -6,7 +6,7 @@ test('scheduler encrypts pushes, isolates users, deduplicates retries and remove
  const keys=webpush.generateVAPIDKeys(),recipient=webpush.generateVAPIDKeys(),p=emptyPlan();p.timezone='Asia/Kathmandu';
  const env={SUPABASE_URL:'https://database.test',SUPABASE_SERVICE_ROLE_KEY:'test-service',APP_ORIGIN:'https://planner.test',VAPID_PUBLIC_KEY:keys.publicKey,VAPID_PRIVATE_KEY:keys.privateKey,VAPID_SUBJECT:'mailto:test@example.com'};
  let claims=new Set(),deliveries=0,removed=false;const original=globalThis.fetch;
- globalThis.fetch=async(url,options={})=>{const u=new URL(url);if(u.hostname==='fcm.googleapis.com'){deliveries++;assert.equal(options.redirect,'error');assert.equal(options.headers['Content-Encoding']||options.headers['content-encoding'],'aes128gcm');assert.ok(options.body.byteLength>0);return new Response(null,{status:410})}
+ globalThis.fetch=async(url,options={})=>{const u=new URL(url);if(u.hostname==='fcm.googleapis.com'){deliveries++;assert.equal(options.redirect,'manual');assert.equal(options.headers['Content-Encoding']||options.headers['content-encoding'],'aes128gcm');assert.ok(options.body.byteLength>0);return new Response(null,{status:410})}
  assert.equal(options.headers.Authorization,'Bearer test-service');
  if(u.pathname.endsWith('/notification_settings'))return Response.json([{user_id:'alice',timezone:p.timezone,enabled:true,start_hour:0,end_hour:23}]);
  if(u.pathname.endsWith('/planners'))return Response.json([{data:p}]);

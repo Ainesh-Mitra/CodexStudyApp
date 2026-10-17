@@ -143,6 +143,7 @@ npx wrangler deploy --dry-run --config worker/wrangler.toml
 
 Browser tests use system Chromium when available; otherwise install Playwright
 Chromium with `npx playwright install chromium`, or set `CHROMIUM_PATH`.
+A Miniflare/workerd runtime test exercises the actual encrypted push request with simulated external services and verifies that redirects are not followed.
 The database tests run actual PostgreSQL policies/functions in PGlite, not a text
 check of the SQL. Cloud account browser tests simulate Supabase responses;
 production login/email/OAuth and physical-phone delivery must be checked after
