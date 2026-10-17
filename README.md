@@ -63,6 +63,10 @@ disabled. Free projects can pause or have quotas, so delivery is best effort.
 Database tests verify two separate users cannot access each other's planner,
 settings, or device subscriptions. Anonymous users have no access. Saves use an
 atomic revision check so an old device cannot overwrite a newer cloud save.
+Visible signed-in devices check the account revision every five seconds and fetch
+the full plan only when it changes; focus/reconnection also triggers a check.
+Refresh waits while a task is being dragged, resized, or named, and while local
+edits are unsaved. Connection failures keep the local plan and retry automatically.
 Conflicts keep local edits and offer a backup download or explicit reload of the
 latest cloud save. Guest and account saves are separate. To migrate your local
 plan, log in, open Schedule settings, and choose **Copy this device's local plan**.

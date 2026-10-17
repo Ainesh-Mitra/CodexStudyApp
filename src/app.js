@@ -161,7 +161,7 @@ function renderPlan(value){
 function readCache(){try{const saved=JSON.parse(localStorage.getItem(cacheKey()));if(saved){validatePlan(saved.plan);return saved}}catch{}return null}
 async function loadAccount(nextUser){
  if(user?.id===nextUser?.id&&!hydrating)return;if(loadingOwner===(nextUser?.id||'guest'))return;const sequence=++accountLoad;loadingOwner=nextUser?.id||'guest';
- clearTimeout(saveTimer);hydrating=true;document.querySelector('main').inert=true;user=nextUser;conflict=false;dirty=false;revision=0;
+ clearTimeout(saveTimer);cloudReadFailed=false;hydrating=true;document.querySelector('main').inert=true;user=nextUser;conflict=false;dirty=false;revision=0;
  document.querySelector('#login-button').textContent=user?'Log out':'Log in';document.querySelector('#account-status').textContent=user?`Private account · ${user.email}`:'Local planner · Log in to sync across devices';
  const local=readCache();
  if(!user){renderPlan(local?.plan||emptyPlan());saveStatus('Saved on this device');loadingOwner=undefined;return}
@@ -170,13 +170,37 @@ async function loadAccount(nextUser){
   if(local?.dirty){revision=local.revision;dirty=true;renderPlan(local.plan);if(data&&data.revision!==revision){conflict=true;saveStatus('Unsynced local edits conflict with another save. Open settings.',true)}else{saveStatus('Saving local edits…');syncSave()}}
   else if(data){revision=data.revision;renderPlan(data.data);cache();saveStatus('Saved to your account')}
   else{renderPlan(local?.plan||emptyPlan());changed()}
- }catch{if(sequence!==accountLoad)return;renderPlan(local?.plan||emptyPlan());revision=local?.revision||0;dirty=!!local?.dirty;saveStatus('Cloud unavailable · Your local copy is open',true)}finally{if(sequence===accountLoad)loadingOwner=undefined}
+ }catch{if(sequence!==accountLoad)return;cloudReadFailed=true;renderPlan(local?.plan||emptyPlan());revision=local?.revision||0;dirty=!!local?.dirty;saveStatus('Cloud unavailable · Your local copy is open',true)}finally{if(sequence===accountLoad)loadingOwner=undefined}
 }
-async function refreshCloud(){if(!cloud||!user||hydrating||dirty||saving)return;const owner=user.id;const {data,error}=await cloud.from('planners').select('data,revision').eq('user_id',owner).maybeSingle();if(!error&&data&&user?.id===owner&&!dirty&&data.revision>revision){revision=data.revision;renderPlan(data.data);cache();saveStatus('Updated from your account')}}
+let refreshingCloud=false,cloudReadFailed=false,pointerActive=false;
+grid.addEventListener('pointerdown',()=>pointerActive=true,{capture:true});
+window.addEventListener('pointerup',()=>pointerActive=false,{capture:true});
+window.addEventListener('pointercancel',()=>pointerActive=false,{capture:true});
+window.addEventListener('blur',()=>pointerActive=false);
+function canRefreshCloud(){return cloud&&user&&!hydrating&&!dirty&&!saving&&!conflict&&!pointerActive&&!pendingTask&&!document.querySelector('.event.moving,.event.resizing')}
+async function refreshCloud(){
+ if(!canRefreshCloud()||refreshingCloud)return;
+ refreshingCloud=true;const owner=user.id,sequence=accountLoad;
+ const stillCurrent=()=>user?.id===owner&&accountLoad===sequence&&canRefreshCloud();
+ try{
+  // Poll only a small revision value; fetch the planner when something changed.
+  const {data:head,error:headError}=await cloud.from('planners').select('revision').eq('user_id',owner).maybeSingle();if(headError)throw headError;
+  if(!stillCurrent())return;
+  if(!head&&revision===0){cloudReadFailed=false;changed();return}
+  if(head&&head.revision>revision){
+   const {data,error}=await cloud.from('planners').select('data,revision').eq('user_id',owner).maybeSingle();if(error)throw error;
+   if(!stillCurrent()||!data||data.revision<=revision)return;
+   validatePlan(data.data);const chosenId=selected?.id;revision=data.revision;renderPlan(data.data);const chosen=subjects.find(subject=>subject.id===chosenId);if(chosen)choose(chosen);cache();saveStatus('Updated from your account');
+  }else if(cloudReadFailed){saveStatus('Saved to your account')}
+  cloudReadFailed=false;
+ }catch{if(stillCurrent()){cloudReadFailed=true;saveStatus('Sync unavailable · Keeping your local copy and retrying automatically.',true)}}
+ finally{refreshingCloud=false}
+}
+setInterval(()=>{if(!document.hidden&&navigator.onLine){if(dirty&&!conflict)syncSave();else refreshCloud()}},5000);
 window.addEventListener('online',()=>dirty?syncSave():refreshCloud());window.addEventListener('focus',refreshCloud);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshCloud()});
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});
-document.querySelector('#retry-save').addEventListener('click',()=>{if(conflict){document.querySelector('#settings-dialog').showModal();return}syncSave()});
+document.querySelector('#retry-save').addEventListener('click',()=>{if(conflict){document.querySelector('#settings-button').click();return}syncSave()});
 for(const button of document.querySelectorAll('[data-close]'))button.addEventListener('click',()=>document.getElementById(button.dataset.close).close());
 document.querySelector('#login-button').addEventListener('click',async()=>{
  if(!cloud){announce('Cloud login needs hosting configuration. Your local planner still saves on this device.');return}
